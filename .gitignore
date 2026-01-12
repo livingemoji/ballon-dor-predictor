@@ -36,3 +36,14 @@ yarn-error.log*
 .env
 .env.test.local
 .env.production.local
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+./venv/
+.venv
+./venv
+# Ignore the Python virtual environment directory
+venv/
+# Or if you named it something else, e.g., .venv
+.venv/ 
