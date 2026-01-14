@@ -1,12 +1,5 @@
 from scoring.aggregation import aggregate_performance
-
-
-COMPETITION_WEIGHT = {
-    "League": 1.0,
-    "Champions League": 1.4,
-    "International": 1.3,
-    "Cup": 0.9
-}
+from scoring.impact_calculator import ImpactCalculator
 
 
 class WeeklyScoringEngine:
@@ -14,25 +7,26 @@ class WeeklyScoringEngine:
         self.sentiment_weight = sentiment_weight
         self.performance_weight = performance_weight
 
-    def compute_week_score(self, performances, sentiment_score):
-        """
-        performances: list of dicts
-        sentiment_score: float [-1, 1]
-        """
+    def compute_week_score(
+        self,
+        performances,
+        sentiment_score,
+        position,
+        stats,
+        crucial_actions
+    ):
+        impact_calc = ImpactCalculator(position)
 
-        weighted_performances = []
+        performance_score = aggregate_performance(performances)
 
-        for p in performances:
-            weight = COMPETITION_WEIGHT.get(p["competition"], 1.0)
-            weighted_performances.append({
-                **p,
-                "rating": p["rating"] * weight
-            })
-
-        performance_score = aggregate_performance(weighted_performances)
+        stat_score = impact_calc.compute_stat_score(stats)
+        stat_score = impact_calc.apply_crucial_actions(
+            stat_score, crucial_actions
+        )
 
         final_score = (
             performance_score * self.performance_weight +
+            stat_score * 0.4 +
             sentiment_score * self.sentiment_weight
         )
 

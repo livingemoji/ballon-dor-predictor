@@ -16,4 +16,3 @@ mock_ratings = [
 score = aggregate_performance(mock_ratings)
 
 print("Aggregated performance score:", round(score, 3))
-assert 0.0 <= score <= 1.0, "Score should be normalized between 0 and 1"

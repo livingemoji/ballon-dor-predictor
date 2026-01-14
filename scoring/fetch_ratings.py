@@ -27,4 +27,3 @@ def get_player_match_ratings(player_id: int, week: int):
         }
         for r in ratings
     ]
-
