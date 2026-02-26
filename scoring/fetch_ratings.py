@@ -10,14 +10,14 @@ def get_player_match_ratings(player_id: int, week: int):
     """
 
     db = SessionLocal()
-
-    ratings = (
-        db.query(MatchRating)
-        .filter(MatchRating.player_id == player_id)
-        .all()
-    )
-
-    db.close()
+    try:
+        ratings = (
+            db.query(MatchRating)
+            .filter(MatchRating.player_id == player_id)
+            .all()
+        )
+    finally:
+        db.close()
 
     return [
         {
@@ -26,4 +26,5 @@ def get_player_match_ratings(player_id: int, week: int):
             "competition": r.competition,
         }
         for r in ratings
+        if r.match_date and r.match_date.isocalendar().week == week
     ]

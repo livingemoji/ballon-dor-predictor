@@ -9,6 +9,7 @@ def get_crucial_actions_for_player(player_name):
     total_crucial_actions = 0
 
     for url in urls:
+        text = ""
         cached = get_cached(url)
         if cached:
             text = cached
@@ -17,6 +18,7 @@ def get_crucial_actions_for_player(player_name):
             if text:
                 set_cache(url, text)
 
-        total_crucial_actions += detect_crucial_actions(text)
+        if text:
+            total_crucial_actions += detect_crucial_actions(text)
 
     return total_crucial_actions
