@@ -1,3 +1,5 @@
+import pytest
+
 from scoring.aggregation import aggregate_performance
 
 
@@ -9,4 +11,4 @@ def test_aggregate_performance_with_competition_weights():
         ]
     )
 
-    assert score == 0.661
+    assert score == pytest.approx(0.661, rel=1e-6)

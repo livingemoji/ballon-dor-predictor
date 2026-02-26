@@ -7,11 +7,13 @@ from sqlalchemy import func
 from db.database import SessionLocal
 from db.models import Player, Sentiment, WeeklyScore
 from engine.weekly_engine import WeeklyScoringEngine
+from analysis.fallback_pipeline import get_crucial_actions_for_player
 from scoring.aggregation import aggregate_performance
 from scoring.fetch_ratings import get_player_match_ratings
 
 
 router = APIRouter()
+VALID_POSITIONS = {"Striker", "Winger", "Midfielder", "Defender", "Goalkeeper"}
 
 
 class WeeklyRunRequest(BaseModel):
@@ -75,8 +77,13 @@ def run_weekly(payload: WeeklyRunRequest) -> Dict:
             sentiment_score = float(sentiment_avg or 0.0)
             stats = {"goals": 0, "assists": 0, "defensive_actions": 0}
             crucial_actions = 0
+            if payload.include_crucial_actions:
+                try:
+                    crucial_actions = get_crucial_actions_for_player(player.name)
+                except Exception:
+                    crucial_actions = 0
 
-            position = player.position if player.position else "Striker"
+            position = player.position if player.position in VALID_POSITIONS else "Striker"
             final_score = engine.compute_week_score(
                 performances=ratings,
                 sentiment_score=sentiment_score,

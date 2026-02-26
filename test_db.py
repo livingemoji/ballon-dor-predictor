@@ -1,18 +1,24 @@
-from db.database import SessionLocal
-from db.models import Player
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-db = SessionLocal()
+from db.models import Base, Player
 
-player = Player(
-    name="Erling Haaland",
-    position="Forward",
-    club="Manchester City"
-)
 
-db.add(player)
-db.commit()
-db.refresh(player)
+def test_player_insert_roundtrip():
+    engine = create_engine("sqlite:///:memory:")
+    Session = sessionmaker(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
-print(player.id, player.name)
+    db = Session()
+    player = Player(
+        name="Erling Haaland",
+        position="Striker",
+        club="Manchester City",
+    )
+    db.add(player)
+    db.commit()
+    db.refresh(player)
 
-db.close()
+    assert player.id is not None
+    assert player.name == "Erling Haaland"
+    db.close()
