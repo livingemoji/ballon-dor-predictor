@@ -1,17 +1,17 @@
 from storage.season_store import SeasonStore
 from leaderboard.ranking import rank_players
 
-store = SeasonStore()
 
-store.add_week_score("Mbappe", 1, 0.78)
-store.add_week_score("Mbappe", 2, 0.81)
+def test_rank_players_sorts_by_total_score_desc():
+    store = SeasonStore()
+    store.add_week_score("Mbappe", 1, 0.78)
+    store.add_week_score("Mbappe", 2, 0.81)
+    store.add_week_score("Haaland", 1, 0.75)
+    store.add_week_score("Haaland", 2, 0.73)
+    store.add_week_score("Messi", 1, 0.69)
 
-store.add_week_score("Haaland", 1, 0.75)
-store.add_week_score("Haaland", 2, 0.73)
+    ranking = rank_players(store)
 
-store.add_week_score("Messi", 1, 0.69)
-
-ranking = rank_players(store)
-
-for i, (player, score) in enumerate(ranking, 1):
-    print(f"{i}. {player} — {score}")
+    assert ranking[0] == ("Mbappe", 1.59)
+    assert ranking[1] == ("Haaland", 1.48)
+    assert ranking[2] == ("Messi", 0.69)
