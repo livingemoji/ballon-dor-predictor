@@ -53,3 +53,9 @@ Chart.js
    `POST /api/run-weekly` with body `{"week": 9, "include_crucial_actions": false}`
 6. Check rankings:
    `GET /api/leaderboard`
+
+## dashboard endpoints ##
+- `GET /api/leaderboard?limit=20`
+- `GET /api/weeks/{week}/snapshot`
+- `GET /api/players/{player_id}/history?limit=52`
+- `GET /api/job-runs?limit=20`

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -61,3 +61,17 @@ class WeeklyScore(Base):
     final_score = Column(Float, nullable=False)
 
     player = relationship("Player", back_populates="weekly_scores")
+
+
+class JobRun(Base):
+    __tablename__ = "job_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    week = Column(Integer, nullable=False, index=True)
+    status = Column(String, nullable=False, index=True)
+    started_at = Column(DateTime, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
+    error_message = Column(String, nullable=True)
+    updated_players = Column(Integer, nullable=False, default=0)
+    ingested_ratings_count = Column(Integer, nullable=False, default=0)
+    ingested_sentiments_count = Column(Integer, nullable=False, default=0)

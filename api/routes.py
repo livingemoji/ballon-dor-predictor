@@ -1,14 +1,14 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 
 from data_sources.performances import fetch_player_performance
 from data_sources.social_sentiment import fetch_social_posts
 from db.database import SessionLocal
-from db.models import MatchRating, Player, Sentiment, WeeklyScore
+from db.models import JobRun, MatchRating, Player, Sentiment, WeeklyScore
 from engine.weekly_engine import WeeklyScoringEngine
 from analysis.fallback_pipeline import get_crucial_actions_for_player
 from scoring.aggregation import aggregate_performance
@@ -217,12 +217,137 @@ def leaderboard(limit: int = 20) -> List[Dict]:
     ]
 
 
+@router.get("/job-runs")
+def list_job_runs(limit: int = 20) -> List[Dict]:
+    db = SessionLocal()
+    try:
+        runs = (
+            db.query(JobRun)
+            .order_by(JobRun.started_at.desc())
+            .limit(limit)
+            .all()
+        )
+    finally:
+        db.close()
+
+    return [
+        {
+            "id": run.id,
+            "week": run.week,
+            "status": run.status,
+            "started_at": run.started_at.isoformat() if run.started_at else None,
+            "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+            "updated_players": run.updated_players,
+            "ingested_ratings_count": run.ingested_ratings_count,
+            "ingested_sentiments_count": run.ingested_sentiments_count,
+            "error_message": run.error_message,
+        }
+        for run in runs
+    ]
+
+
+@router.get("/weeks/{week}/snapshot")
+def week_snapshot(week: int) -> Dict:
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(
+                WeeklyScore.player_id,
+                Player.name.label("player_name"),
+                WeeklyScore.performance_score,
+                WeeklyScore.sentiment_score,
+                WeeklyScore.final_score,
+            )
+            .join(Player, Player.id == WeeklyScore.player_id)
+            .filter(WeeklyScore.week == week)
+            .order_by(WeeklyScore.final_score.desc())
+            .all()
+        )
+    finally:
+        db.close()
+
+    players = [
+        {
+            "rank": idx + 1,
+            "player_id": row.player_id,
+            "player_name": row.player_name,
+            "performance_score": round(float(row.performance_score), 4),
+            "sentiment_score": round(float(row.sentiment_score), 4),
+            "final_score": round(float(row.final_score), 4),
+        }
+        for idx, row in enumerate(rows)
+    ]
+    return {"week": week, "count": len(players), "players": players}
+
+
+@router.get("/players/{player_id}/history")
+def player_history(player_id: int, limit: int = 52) -> Dict:
+    db = SessionLocal()
+    try:
+        player = db.query(Player).filter(Player.id == player_id).one_or_none()
+        if player is None:
+            raise HTTPException(status_code=404, detail="Player not found")
+
+        history_rows = (
+            db.query(WeeklyScore)
+            .filter(WeeklyScore.player_id == player_id)
+            .order_by(WeeklyScore.week.desc())
+            .limit(limit)
+            .all()
+        )
+    finally:
+        db.close()
+
+    history = [
+        {
+            "week": row.week,
+            "performance_score": round(float(row.performance_score), 4),
+            "sentiment_score": round(float(row.sentiment_score), 4),
+            "final_score": round(float(row.final_score), 4),
+        }
+        for row in reversed(history_rows)
+    ]
+    return {
+        "player_id": player.id,
+        "player_name": player.name,
+        "position": player.position,
+        "club": player.club,
+        "history": history,
+    }
+
+
 @router.post("/run-weekly")
 def run_weekly(payload: WeeklyRunRequest) -> Dict:
     engine = WeeklyScoringEngine()
     sentiment_pipeline = SentimentPipeline()
     db = SessionLocal()
     output = []
+    total_ingested_ratings = 0
+    total_ingested_sentiments = 0
+    now = datetime.utcnow()
+    existing_running_job = (
+        db.query(JobRun)
+        .filter(JobRun.week == payload.week, JobRun.status == "running")
+        .one_or_none()
+    )
+    if existing_running_job is not None:
+        db.close()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Week {payload.week} already has a running job (id={existing_running_job.id})",
+        )
+
+    job_run = JobRun(
+        week=payload.week,
+        status="running",
+        started_at=now,
+        updated_players=0,
+        ingested_ratings_count=0,
+        ingested_sentiments_count=0,
+    )
+    db.add(job_run)
+    db.commit()
+    db.refresh(job_run)
 
     try:
         players = db.query(Player).all()
@@ -233,6 +358,8 @@ def run_weekly(payload: WeeklyRunRequest) -> Dict:
             ingested_sentiments = _ingest_weekly_sentiments(
                 db, player, payload.week, sentiment_pipeline
             )
+            total_ingested_ratings += ingested_ratings
+            total_ingested_sentiments += ingested_sentiments
             db.flush()
 
             ratings = get_player_match_ratings(player.id, payload.week, db_session=db)
@@ -295,7 +422,27 @@ def run_weekly(payload: WeeklyRunRequest) -> Dict:
                 }
             )
 
+        job_run.status = "completed"
+        job_run.finished_at = datetime.utcnow()
+        job_run.updated_players = len(output)
+        job_run.ingested_ratings_count = total_ingested_ratings
+        job_run.ingested_sentiments_count = total_ingested_sentiments
         db.commit()
-        return {"week": payload.week, "updated_players": len(output), "scores": output}
+        return {
+            "job_run_id": job_run.id,
+            "week": payload.week,
+            "status": job_run.status,
+            "updated_players": len(output),
+            "ingested_ratings_count": total_ingested_ratings,
+            "ingested_sentiments_count": total_ingested_sentiments,
+            "scores": output,
+        }
+    except Exception as exc:
+        db.rollback()
+        job_run.status = "failed"
+        job_run.finished_at = datetime.utcnow()
+        job_run.error_message = str(exc)[:500]
+        db.commit()
+        raise
     finally:
         db.close()
