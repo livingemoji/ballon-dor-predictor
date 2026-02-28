@@ -2,14 +2,15 @@ from db.database import SessionLocal
 from db.models import MatchRating
 
 
-def get_player_match_ratings(player_id: int, week: int):
+def get_player_match_ratings(player_id: int, week: int, db_session=None):
     """
     NOTE:
     For now, we assume 'week' maps to match_date externally.
     This will be improved later.
     """
 
-    db = SessionLocal()
+    db = db_session or SessionLocal()
+    should_close = db_session is None
     try:
         ratings = (
             db.query(MatchRating)
@@ -17,7 +18,8 @@ def get_player_match_ratings(player_id: int, week: int):
             .all()
         )
     finally:
-        db.close()
+        if should_close:
+            db.close()
 
     return [
         {

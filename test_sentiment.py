@@ -7,13 +7,13 @@ def test_sentiment_pipeline_produces_scores_and_keeps_metadata():
         [
             {
                 "player_id": 1,
-                "text": "What a performance from Haaland, absolute monster!",
+                "text": "I absolutely love this amazing player. Brilliant and excellent.",
                 "source": "twitter",
                 "week": 1,
             },
             {
                 "player_id": 1,
-                "text": "Invisible again in big matches...",
+                "text": "I hate this awful performance. Terrible and disappointing.",
                 "source": "twitter",
                 "week": 1,
             },
@@ -24,4 +24,6 @@ def test_sentiment_pipeline_produces_scores_and_keeps_metadata():
     assert results[0]["player_id"] == 1
     assert results[0]["source"] == "twitter"
     assert results[0]["week"] == 1
+    assert -1.0 <= results[0]["vader_score"] <= 1.0
+    assert -1.0 <= results[1]["vader_score"] <= 1.0
     assert results[0]["vader_score"] > results[1]["vader_score"]

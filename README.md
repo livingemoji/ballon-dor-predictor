@@ -39,3 +39,17 @@ Chart.js
 8. Compute weekly score
 9. Store results
 10. Update leaderboard
+
+## quick start ##
+1. Initialize DB schema:
+   `python -m db.init_db`
+2. Seed starter players:
+   `python -m db.seed_players`
+3. Run API:
+   `uvicorn api.main:app --reload`
+4. Seed via API (optional, idempotent):
+   `POST /api/seed-players`
+5. Run weekly pipeline:
+   `POST /api/run-weekly` with body `{"week": 9, "include_crucial_actions": false}`
+6. Check rankings:
+   `GET /api/leaderboard`
